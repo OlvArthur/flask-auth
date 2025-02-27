@@ -25,17 +25,21 @@ def login():
   username = data.get('username')
   password = data.get('password')
 
-  if not username or not password:
+  missing_credentials = not username or not password
+
+  if missing_credentials:
     return jsonify({'message': 'Missing credentials' }), 400
   
   user = User.query.filter_by(username=username).first()
 
-  if not user or user.password != password:
+  user_not_found = not user
+  user_password = getattr(user, "password", None)
+  wrong_password = user_password != password
+
+  if user_not_found or wrong_password:
     return jsonify({'message': 'Invalid credentials' }), 400
   
   login_user(user)
-
-  print(current_user.is_authenticated)
 
   return jsonify({'message': 'Successfull login'})
 
