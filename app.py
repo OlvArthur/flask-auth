@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from models.user import User
 from database import db
-from flask_login import LoginManager, login_required, login_user, logout_user
+from flask_login import LoginManager, login_required, login_user, logout_user, current_user
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'my_secret_key'
@@ -51,6 +51,85 @@ def logout():
   return jsonify({
     'message': 'Successfully loged out'
   })
+
+@app.route('/users', methods=['POST'])
+def create_user():
+  data = request.get_json()
+
+  username = data.get('username')
+  password = data.get('password')
+
+
+  missing_credentials = not username or not password
+
+  if missing_credentials:
+    return jsonify({'message': 'Missing credentials' }), 400
+
+  new_user = User(username=username, password=password)
+
+  db.session.add(new_user)
+  db.session.commit()
+
+  return jsonify({'message': 'User successfully created'})
+
+@app.route('/users', methods=['GET'])
+@login_required
+def get_user():
+  users: list[User] = User.query.all()
+  
+  users = [user.to_dict() for user in users]
+
+  return jsonify({
+    'users': users,
+  })
+
+@app.route('/users/<int:id>',methods=['GET'])
+@login_required
+def read_users(id):
+  found_user: User | None = User.query.get(id)
+
+  if not found_user:
+    return jsonify({'message': 'User not found'})
+
+  
+  return { 'user': found_user.to_dict() }
+
+
+@app.route('/users/<int:id>',methods=['PUT'])
+@login_required
+def update_user(id):
+  data = request.json
+  new_password = data.get('password')
+
+  found_user: User | None = User.query.get(id)
+
+  if not found_user:
+    return jsonify({'message': f'User {id} not found'}), 404
+
+  found_user.password = new_password or found_user.password
+
+  db.session.commit()
+
+  return jsonify({'message': f'User {id} successfully updated'})
+
+
+@app.route('/users/<int:id>', methods=['DELETE'])
+@login_required
+def delete_user_by_id(id):
+  found_user: User | None = User.query.get(id)
+
+  if id == current_user.id:
+    return jsonify({'message': 'You can not delete yourself'}), 403
+
+  if not found_user:
+    return jsonify({'message': 'User not found'}), 404
+  
+  
+
+  db.session.delete(found_user)
+  db.session.commit()
+
+  return jsonify({'message':f'User {id} successfully deleted'})
 
 @app.route('/hello-world', methods=['GET'])
 def hello_world():
