@@ -5,7 +5,7 @@ from flask_login import LoginManager, login_required, login_user, logout_user, c
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'my_secret_key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:admin123@127.0.0.1:3306/flask-auth'
 
 
 login_manager = LoginManager()
@@ -53,6 +53,7 @@ def logout():
   })
 
 @app.route('/users', methods=['POST'])
+@login_required
 def create_user():
   data = request.get_json()
 
