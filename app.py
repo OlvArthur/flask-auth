@@ -53,12 +53,12 @@ def logout():
   })
 
 @app.route('/users', methods=['POST'])
-@login_required
 def create_user():
   data = request.get_json()
 
   username = data.get('username')
   password = data.get('password')
+  role = data.get('role')
 
 
   missing_credentials = not username or not password
@@ -66,7 +66,7 @@ def create_user():
   if missing_credentials:
     return jsonify({'message': 'Missing credentials' }), 400
 
-  new_user = User(username=username, password=password)
+  new_user = User(username=username, password=password, role=role or 'user')
 
   db.session.add(new_user)
   db.session.commit()
@@ -100,6 +100,7 @@ def read_users(id):
 @login_required
 def update_user(id):
   data = request.json
+  new_role = data.get('role')
   new_password = data.get('password')
 
   found_user: User | None = User.query.get(id)
@@ -107,7 +108,22 @@ def update_user(id):
   if not found_user:
     return jsonify({'message': f'User {id} not found'}), 404
 
+  if current_user.role != 'admin':
+    if new_role:
+      return jsonify({'message': 'You are not allowed to change a user role'}), 403
+    
+    if new_password and current_user.id != id:
+      return jsonify({'message': 'You are not allowed to change other user`s passwords'}), 403
+
   found_user.password = new_password or found_user.password
+
+  number_admins = User.query.filter_by(role='admin').limit(2).count()
+
+  if number_admins == 1 and new_role and current_user.id == id:
+    return jsonify({'message': 'You can not change your role as you are the only admin'}), 403
+
+  found_user.role = new_role or found_user.role
+
 
   db.session.commit()
 
@@ -119,14 +135,15 @@ def update_user(id):
 def delete_user_by_id(id):
   found_user: User | None = User.query.get(id)
 
+  if current_user.role != 'admin':
+    return jsonify({'message': 'You are not allowed to delete a user'}), 403
+
   if id == current_user.id:
     return jsonify({'message': 'You can not delete yourself'}), 403
 
   if not found_user:
     return jsonify({'message': 'User not found'}), 404
   
-  
-
   db.session.delete(found_user)
   db.session.commit()
 
